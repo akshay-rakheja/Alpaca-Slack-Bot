@@ -23,19 +23,14 @@ BOT_ID = client.api_call("auth.test")['user_id']
 #ALPACA_SECRET_KEY = os.environ['ALPACA_SECRET_KEY']
 #BASE_APP_URL = os.environ['BASE_APP_URL']
 
-paperview = False 
-
 # Initializes your app with your bot token and signing secret
 
-@app.route('/alpaca-connect', methods=['POST'])
+@app.route('/alpaca-connect', methods=['GET', 'POST'])
 def alpaca_connect():
-    data = request.form 
-    client.chat_postMessage(channel = data['channel_id'], text='<https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=3587772637143.3615493290961&redirect_uri=https://slack.com/oauth/v2/authorize?scope=slash-command&client_id=3587772637143.3615493290961>')
-    return Response("Hello"), 200 
+    return Response("Go to this link to connect your Alpaca account: https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=3587772637143.3615493290961&redirect_uri=https://slack.com/oauth/v2/authorize?scope=commands&client_id=3587772637143.3615493290961"), 200 
 
 @app.route('/alpaca', methods=['GET', 'POST'])
 def alpaca():
-    data = request.form
     #client.chat_postMessage(channel = data['channel_id'], text = "HI")
     return Response("Welcome to Alpaca for Slack!"), 200
 
