@@ -1,12 +1,10 @@
 import os
 import slack
-import sql
 from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, request, Response, jsonify, abort
 from slackeventsapi import SlackEventAdapter
-#import alpaca_trade_api as alpaca
-from slack_bolt import App
+import alpaca_trade_api as alpaca
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -27,7 +25,7 @@ BOT_ID = client.api_call("auth.test")['user_id']
 
 @app.route('/alpaca-connect', methods=['GET', 'POST'])
 def alpaca_connect():
-    return Response("Go to this link to connect your Alpaca account: https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=3587772637143.3615493290961&redirect_uri=https://slack.com/oauth/v2/authorize?scope=commands&client_id=3587772637143.3615493290961"), 200 
+    return Response("Go to this link to connect your Alpaca account: https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969&redirect_uri=https://3698-50-208-212-121.ngrok.io/alpaca-connect&scope=account:write%20trading%20data"), 200 
 
 @app.route('/alpaca', methods=['GET', 'POST'])
 def alpaca():
