@@ -1,0 +1,4 @@
+alpaca_trade_api
+flask
+slackeventsapi
+slack
