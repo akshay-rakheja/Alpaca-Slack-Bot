@@ -18,11 +18,17 @@ client = WebClient(token=config.SLACK_TOKEN)
 client.chat_postMessage(channel='#alpaca-slack-bot', text="TEST")
 
 
-@app.route('/alpaca')
+@app.route('/')
+def index():
+    return 'Hello, World!'
+
+
+@app.route('/alpaca', methods=['POST', 'GET'])
 def alpaca():
+    print("Hello world")
     return Response("Welcome to Alpaca for Slack!"), 200
 
 
 # Start your app
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="localhost", debug=True, port=8080)
