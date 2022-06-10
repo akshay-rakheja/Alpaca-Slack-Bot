@@ -23,7 +23,7 @@ def index():
     return 'Hello, World!'
 
 
-@app.route('/alpaca', methods=['POST', 'GET'])
+@app.route('/alpaca2', methods=['POST', 'GET'])
 def alpaca():
     print("Hello world")
     return Response("Welcome to Alpaca for Slack!"), 200
