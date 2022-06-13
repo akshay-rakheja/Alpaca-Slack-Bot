@@ -40,10 +40,30 @@ def alpaca():
         return Response(handleDisplayAccount(user_id, 0)), 200
     elif text == "":
         return Response("HI"), 200
-    
-    #team id then channel id
-    # else:
-    #     return Response("Hello"), 200
+
+@app.route('/alpaca-buy', methods=['GET', 'POST'])
+def buy():
+    data = request.form
+    # verify user here
+    text = data['text'], lst = []
+    coms = text.split(), lst.append(coms)
+    if lst.length() != 2:
+        return Response("error"), 400
+    symbol = coms[0], qty = coms[1]
+    # if statement - confirm user has sufficient funds
+    # then execute trade
+    # else statement - 
+    # then error 
+
+@app.route('/alpaca-sell', methods=['GET', 'POST'])
+def sell():
+    data = request.form
+    text = data['text'], lst = []
+    coms = text.split(), lst.append(coms)
+    if lst.length() != 2:
+        return Response("error"), 400
+    symbol = coms[0], qty = coms[1]
+
 
 def handleDisplayAccount(userID, token):
     data = request.form()
