@@ -2,9 +2,10 @@ import os
 import slack
 from pathlib import Path
 from dotenv import load_dotenv
-from flask import Flask, request, Response, jsonify, abort
+from flask import Flask, request, Response, jsonify, abort, redirect
 from slackeventsapi import SlackEventAdapter
 import alpaca_trade_api as alpaca
+import requests
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -30,35 +31,41 @@ def alpaca():
     team_id = data['team_id']
     channel_id = data['channel_id']
     text = data['text'] 
+    user_id = data['user_id']
     print(team_id, channel_id)
-    if data['text'] == "connect":
+    if text == "connect":
+        #client.chat_postEphemeral("https://api.alpaca.markets/oauth/grant_type=authorization_code&code=67f74f5a-a2cc-4ebd-88b4-22453fe07994&client_id=fc9c55efa3924f369d6c1148e668bbe8&client_secret=5b8027074d8ab434882c0806833e76508861c366&redirect_uri=https://example.com/oauth/callback")
         return Response(f"Go to this link to connect your Alpaca account: https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969&redirect_uri=https://app.slack.com/client/{team_id}/{channel_id}&scope=account:write%20trading%20data"), 200 
+    elif text == "display":
+        return Response(handleDisplayAccount(user_id, 0)), 200
+    elif text == "":
+        return Response("HI"), 200
     
     #team id then channel id
     # else:
     #     return Response("Hello"), 200
 
-# def handleDisplayAccount(userID, token):
-#     data = request.form()
-#     channel_id = data['channel_id']
-#     alpacaClient = alpaca.NewClient()
-#     account = alpacaClient.getAccount()
+def handleDisplayAccount(userID, token):
+    data = request.form()
+    channel_id = data['channel_id']
+    alpacaClient = alpaca.NewClient()
+    account = alpacaClient.getAccount()
 
-#     # gather the values from account
-#     commands = {
-#         "an": account.Accountnumber,
-#         "eq": "$" + account.Equity.String(),
-#         "lmv": "$" + account.LongMarketValue.String(),
-#         "smv": "$" + account.ShortMarketValue.String(), 
-#         "ct": "$" + account.Equity.Sub(account.LastEquity).String(), 
-#         "bp": "$" + account.BuyingPower.String() 
-#     }
+    # gather the values from account
+    commands = {
+        "an": account.Accountnumber,
+        "eq": "$" + account.Equity.String(),
+        "lmv": "$" + account.LongMarketValue.String(),
+        "smv": "$" + account.ShortMarketValue.String(), 
+        "ct": "$" + account.Equity.Sub(account.LastEquity).String(), 
+        "bp": "$" + account.BuyingPower.String() 
+    }
 
-#     #display the account values
-#     message = "Account Number: {} | Equity: {} | Long Market Value {} | Short Market Value {} | Change Today {} | Buying Power {} ".format(
-#         commands["an"], commands["eq"], commands["lmv"], commands["smv"], commands["ct"], commands["bp"])
+    #display the account values
+    message = "Account Number: {} | Equity: {} | Long Market Value {} | Short Market Value {} | Change Today {} | Buying Power {} ".format(
+        commands["an"], commands["eq"], commands["lmv"], commands["smv"], commands["ct"], commands["bp"])
 
-#     return client.chat_postEphemeral(text = message, userID = userID)
+    return message
 
 # Start your app
 if __name__ == "__main__":
