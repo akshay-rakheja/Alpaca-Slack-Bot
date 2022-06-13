@@ -1,11 +1,10 @@
-import os
-import slack
+import os, slack, requests
 from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, request, Response, jsonify, abort, redirect
 from slackeventsapi import SlackEventAdapter
 import alpaca_trade_api as alpaca
-import requests
+
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -18,9 +17,9 @@ client = slack.WebClient(token=os.environ['SLACK_TOKEN'])
 
 BOT_ID = client.api_call("auth.test")['user_id']
 
-#ALPACA_API_KEY = os.environ['ALPACA_API_KEY']
-#ALPACA_SECRET_KEY = os.environ['ALPACA_SECRET_KEY']
-#BASE_APP_URL = os.environ['BASE_APP_URL']
+# BASE_ALPACA_URL = 'https://api.alpaca.markets'
+# HEADERS = {'APCA-API-KEY-ID': os.environ['ALPACA_API_KEY'],
+#            'APCA-API-SECRET-KEY': os.environ['ALPACA_SECRET_KEY']}
 
 # Initializes your app with your bot token and signing secret
 
@@ -35,11 +34,17 @@ def alpaca():
     print(team_id, channel_id)
     if text == "connect":
         #client.chat_postEphemeral("https://api.alpaca.markets/oauth/grant_type=authorization_code&code=67f74f5a-a2cc-4ebd-88b4-22453fe07994&client_id=fc9c55efa3924f369d6c1148e668bbe8&client_secret=5b8027074d8ab434882c0806833e76508861c366&redirect_uri=https://example.com/oauth/callback")
-        return Response(f"Go to this link to connect your Alpaca account: https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969&redirect_uri=https://app.slack.com/client/{team_id}/{channel_id}&scope=account:write%20trading%20data"), 200 
+        return Response(f"Go to this link to connect your Alpaca account: https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969&redirect_uri=https://efc5-152-44-181-213.ngrok.io/auth&scope=account:write%20trading%20data"), 200 
     elif text == "display":
         return Response(handleDisplayAccount(user_id, 0)), 200
     elif text == "":
         return Response("HI"), 200
+
+@app.route('/auth', methods=['GET'])
+def auth():
+    dictionary = {}
+    auth_code = request.args.get("code")
+    return Response(request.args.get("code")), 200
 
 @app.route('/alpaca-buy', methods=['GET', 'POST'])
 def buy():
