@@ -34,7 +34,7 @@ def alpaca():
     print(team_id, channel_id)
     if text == "connect":
         #client.chat_postEphemeral("https://api.alpaca.markets/oauth/grant_type=authorization_code&code=67f74f5a-a2cc-4ebd-88b4-22453fe07994&client_id=fc9c55efa3924f369d6c1148e668bbe8&client_secret=5b8027074d8ab434882c0806833e76508861c366&redirect_uri=https://example.com/oauth/callback")
-        return Response(f"Go to this link to connect your Alpaca account: https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969&redirect_uri=https://efc5-152-44-181-213.ngrok.io/auth&scope=account:write%20trading%20data"), 200 
+        return redirect("https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969&redirect_uri=https://efc5-152-44-181-213.ngrok.io/auth&scope=account:write%20trading%20data"), 200 
     elif text == "display":
         return Response(handleDisplayAccount(user_id, 0)), 200
     elif text == "":
@@ -44,7 +44,7 @@ def alpaca():
 def auth():
     dictionary = {}
     auth_code = request.args.get("code")
-    return Response(request.args.get("code")), 200
+    return Response.redirect("slack.com"), 200
 
 @app.route('/alpaca-buy', methods=['GET', 'POST'])
 def buy():
