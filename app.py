@@ -34,27 +34,43 @@ def alpaca():
     print(team_id, channel_id)
     if text == "connect":
         #client.chat_postEphemeral("https://api.alpaca.markets/oauth/grant_type=authorization_code&code=67f74f5a-a2cc-4ebd-88b4-22453fe07994&client_id=fc9c55efa3924f369d6c1148e668bbe8&client_secret=5b8027074d8ab434882c0806833e76508861c366&redirect_uri=https://example.com/oauth/callback")
-        return redirect("https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969" + 
+        return Response("https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969" + 
         "&redirect_uri=https://efc5-152-44-181-213.ngrok.io/auth&scope=account:write%20trading%20data"), 200 
     elif text == "display":
         return Response(handleDisplayAccount(user_id, 0)), 200
     elif text == "":
         return Response("HI"), 200
 
-@app.route('/auth', methods=['GET'])
+@app.route('/auth', methods=['GET', 'POST'])
 def auth():
     dictionary = {}
     auth_code = request.args.get("code")
+    print(auth_code)
     if auth_code != "":
-        request.post(BASE_TOKEN_URL + '/grant_type=authorization_code&code=' + auth_code + '&client_id=' 
+        requests.post(BASE_TOKEN_URL + '?grant_type=authorization_code&code=' + auth_code + '&client_id=' 
         + os.environ['ALPACA_CLIENT_ID'] + '&client_secret=' + os.environ['ALPACA_CLIENT_SECRET'] + '&redirect_uri=' 
         + 'https://efc5-152-44-181-213.ngrok.io/auth')
-        
-    return redirect("https://slack.com"), 200
+        auth_token = request.args.get("access_token")
+        print(auth_token)
+        return Response("Token")
+    #     auth_token = request.args.get("access_token")
+    # if auth_token != "":
+    #     print(auth_token)
+    #     return Response(auth_token), 200
+    else:
+        return Response("ok"), 200
 
+@app.route('/token', methods=['GET'])
+def token():
+    auth_token = request.args.get("auth_token")
+    if auth_token != "":
+        return Response(auth_token)
+    else:
+        return Response("no")
 @app.route('/alpaca-buy', methods=['GET', 'POST'])
 def buy():
     data = request.form
+    alpacaClient = alpaca.NewClient() 
     # verify user here
     text = data['text'], lst = []
     coms = text.split(), lst.append(coms)
