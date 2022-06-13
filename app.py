@@ -45,26 +45,27 @@ def alpaca():
 def auth():
     dictionary = {}
     auth_code = request.args.get("code")
-    print(auth_code)
+    print(auth_code + 'this is the auth code')
     if auth_code != "":
-        requests.post(BASE_TOKEN_URL + '?grant_type=authorization_code&code=' + auth_code + '&client_id=' 
+        url = (BASE_TOKEN_URL + '?grant_type=authorization_code&code=' + auth_code + '&client_id=' 
         + os.environ['ALPACA_CLIENT_ID'] + '&client_secret=' + os.environ['ALPACA_CLIENT_SECRET'] + '&redirect_uri=' 
         + 'https://efc5-152-44-181-213.ngrok.io/auth')
-        auth_token = request.args.get("access_token")
-        print(auth_token)
-        return Response("Token")
+        access_response = requests.post(url)
+        print(url)
+
+    return Response(access_response)
     #     auth_token = request.args.get("access_token")
     # if auth_token != "":
     #     print(auth_token)
     #     return Response(auth_token), 200
-    else:
-        return Response("ok"), 200
+
 
 @app.route('/token', methods=['GET'])
 def token():
-    auth_token = request.args.get("auth_token")
-    if auth_token != "":
-        return Response(auth_token)
+    access_token = request.args.get("access_token")
+    print(access_token + 'this is the accesstoken')
+    if access_token != "":
+        return Response(access_token)
     else:
         return Response("no")
 @app.route('/alpaca-buy', methods=['GET', 'POST'])
