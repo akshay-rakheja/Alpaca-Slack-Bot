@@ -15,7 +15,7 @@ slackeventadapter = SlackEventAdapter(
     config.SLACK_SIGNING_SECRET, "/slack/events", app)
 
 client = WebClient(token=config.SLACK_TOKEN)
-client.chat_postMessage(channel='#alpaca-slack-bot', text="TEST")
+# client.chat_postMessage(channel='#alpaca-slack-bot', text="TEST")
 
 
 @app.route('/')
