@@ -17,6 +17,7 @@ client = slack.WebClient(token=os.environ['SLACK_TOKEN'])
 
 BOT_ID = client.api_call("auth.test")['user_id']
 BASE_TOKEN_URL = "https://api.alpaca.markets/oauth/token"
+NGROK = "https://53b3-50-208-212-121.ngrok.io"
 # BASE_ALPACA_URL = 'https://api.alpaca.markets'
 # HEADERS = {'APCA-API-KEY-ID': os.environ['ALPACA_API_KEY'],
 #            'APCA-API-SECRET-KEY': os.environ['ALPACA_SECRET_KEY']}
@@ -35,7 +36,7 @@ def alpaca():
     if text == "connect":
         #client.chat_postEphemeral("https://api.alpaca.markets/oauth/grant_type=authorization_code&code=67f74f5a-a2cc-4ebd-88b4-22453fe07994&client_id=fc9c55efa3924f369d6c1148e668bbe8&client_secret=5b8027074d8ab434882c0806833e76508861c366&redirect_uri=https://example.com/oauth/callback")
         return Response("https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969" + 
-        "&redirect_uri=https://efc5-152-44-181-213.ngrok.io/auth&scope=account:write%20trading%20data"), 200 
+        "&redirect_uri=" + NGROK + "/auth&scope=account:write%20trading%20data"), 200 
     elif text == "display":
         return Response(handleDisplayAccount(user_id, 0)), 200
     elif text == "":
@@ -46,13 +47,14 @@ def auth():
     dictionary = {}
     auth_code = request.args.get("code")
     print(auth_code + 'this is the auth code')
+    redirect_uri = NGROK + '/auth'
     if auth_code != "":
         access_response = requests.post(BASE_TOKEN_URL, data={
             'grant_type': 'authorization_code',
             'code': auth_code,
             'client_id': os.environ['ALPACA_CLIENT_ID'],
             'client_secret': os.environ['ALPACA_CLIENT_SECRET'],
-            'redirect_uri': 'https://efc5-152-44-181-213.ngrok.io/auth'
+            'redirect_uri': redirect_uri
         })
 
     return redirect("https://app.slack.com")
