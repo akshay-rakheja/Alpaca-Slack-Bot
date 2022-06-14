@@ -12,7 +12,7 @@ cur = conn.cursor()
 print("Cursor created")
 
 
-cur.execute("insert into token_table values ('1', '10')")
+cur.execute("insert into token_table values ('1-2', '10-asd')")
 conn.commit()
 
 cur.execute("select * from token_table")

@@ -8,6 +8,7 @@ from slackeventsapi import SlackEventAdapter
 import alpaca_trade_api as alpaca
 import config
 from slack_sdk import WebClient
+import psycopg2
 
 
 # Configure flask app
@@ -18,15 +19,18 @@ slackeventadapter = SlackEventAdapter(
 client = WebClient(token=config.SLACK_TOKEN)
 
 
-#DB_USER, DB_PASSWORD, DB_NAME = os.environ['DBUSER'], os.environ['DBPASSWORD'], os.environ['DBNAME']
+# connect to db
+conn = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME,
+                        user=config.DB_USER, password=config.DB_PASSWORD)
+
+print("Connected to database")
+
+
+# cursor
+cur = conn.cursor()
 
 BOT_ID = client.api_call("auth.test")['user_id']
 BASE_TOKEN_URL = "https://api.alpaca.markets/oauth/token"
-# BASE_ALPACA_URL = 'https://api.alpaca.markets'
-# HEADERS = {'APCA-API-KEY-ID': os.environ['ALPACA_API_KEY'],
-#            'APCA-API-SECRET-KEY': os.environ['ALPACA_SECRET_KEY']}
-
-# Initializes your app with your bot token and signing secret
 
 
 @app.route('/alpaca2', methods=['GET', 'POST'])
@@ -40,7 +44,7 @@ def alpaca():
     if text == "connect":
         # client.chat_postEphemeral("https://api.alpaca.markets/oauth/grant_type=authorization_code&code=67f74f5a-a2cc-4ebd-88b4-22453fe07994&client_id=fc9c55efa3924f369d6c1148e668bbe8&client_secret=5b8027074d8ab434882c0806833e76508861c366&redirect_uri=https://example.com/oauth/callback")
         return Response("https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=1d5c0276b371931fdf8077209a90e460" +
-                        "&redirect_uri=https://13d5-192-159-178-211.ngrok.io/auth&scope=account:write%20trading%20data"), 200
+                        "&redirect_uri=https://0c0a-192-159-178-211.ngrok.io/auth&scope=account:write%20trading%20data"), 200
     elif text == "display":
         return Response(handleDisplayAccount(user_id, 0)), 200
     elif text == "":
@@ -58,10 +62,17 @@ def auth():
             'code': auth_code,
             'client_id': config.ALPACA_CLIENT_ID,
             'client_secret': config.ALPACA_CLIENT_SECRET,
-            'redirect_uri': 'https://13d5-192-159-178-211.ngrok.io/auth'
+            'redirect_uri': 'https://0c0a-192-159-178-211.ngrok.io/auth'
         })
     access_token = access_response.json()['access_token']
     print(access_token + ' <---- this is the access token')
+    if access_token != "":
+        cur.execute('insert into token_table (user_id, access_token) values (%s, %s)', (
+            auth_code, access_token))
+        conn.commit()
+        cur.close()
+        conn.close()
+
     return redirect("https://app.slack.com")
     #     auth_token = request.args.get("access_token")
     # if auth_token != "":
@@ -85,7 +96,7 @@ def buy():
     # then error
 
 
-@app.route('/alpaca-sell', methods=['GET', 'POST'])
+@ app.route('/alpaca-sell', methods=['GET', 'POST'])
 def sell():
     data = request.form
     text = data['text'], lst = []
