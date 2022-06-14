@@ -47,13 +47,15 @@ def auth():
     auth_code = request.args.get("code")
     print(auth_code + 'this is the auth code')
     if auth_code != "":
-        url = (BASE_TOKEN_URL + '?grant_type=authorization_code&code=' + auth_code + '&client_id=' 
-        + os.environ['ALPACA_CLIENT_ID'] + '&client_secret=' + os.environ['ALPACA_CLIENT_SECRET'] + '&redirect_uri=' 
-        + 'https://efc5-152-44-181-213.ngrok.io/auth')
-        access_response = requests.post(url)
-        print(url)
+        access_response = requests.post(BASE_TOKEN_URL, data={
+            'grant_type': 'authorization_code',
+            'code': auth_code,
+            'client_id': os.environ['ALPACA_CLIENT_ID'],
+            'client_secret': os.environ['ALPACA_CLIENT_SECRET'],
+            'redirect_uri': 'https://efc5-152-44-181-213.ngrok.io/auth'
+        })
 
-    return Response(access_response)
+    return redirect("https://app.slack.com")
     #     auth_token = request.args.get("access_token")
     # if auth_token != "":
     #     print(auth_token)
