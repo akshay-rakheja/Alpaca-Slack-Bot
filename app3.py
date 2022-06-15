@@ -26,6 +26,11 @@ BOT_ID = client.api_call("auth.test")['user_id']
 BASE_TOKEN_URL = "https://api.alpaca.markets/oauth/token"
 
 
+# Alpaca API endpoints
+BASE_ALPACA_PAPER_URL = 'https://paper-api.alpaca.markets'
+BASE_ALPACA_LIVE_URL = 'https://api.alpaca.markets'
+
+
 @app.route('/alpaca2', methods=['GET', 'POST'])
 def alpaca():
     # Retrieve the user_id and text from slash command
@@ -96,26 +101,98 @@ def auth():
     return redirect("https://app.slack.com")
 
 
-@app.route('/alpaca-buy', methods=['GET', 'POST'])
+@app.route('/alpaca2-buy', methods=['GET', 'POST'])
 def buy():
+
+    # Try to connect to DB
+    try:
+        # connect to db
+        conn = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME,
+                                user=config.DB_USER, password=config.DB_PASSWORD)
+        # Open Cursor
+        cur = conn.cursor()
+    except:
+        print("Error connecting to DB")
+
     data = request.form
-    alpacaClient = alpaca.NewClient()
-    # verify user here
-    text = data['text'], lst = []
-    coms = text.split(), lst.append(coms)
-    if lst.length() != 2:
-        return Response("error"), 400
-    symbol = coms[0], qty = coms[1]
+
+    # Retrieve command args and verify user here
+    # TODO: error checking for bad args
+    try:
+        text = data['text']
+        lst = []
+        user_id = data['user_id']
+        params = text.split()
+        symbol = params[0]
+        qty = params[1]
+        print(symbol + ' <---- this is the symbol')
+        print(qty + ' <---- this is the qty')
+        print(user_id + ' <---- this is the user id')
+    except:
+        print("Error getting data from slash command, perhaps missing/incorrect args")
+
+    # Get the access token from DB if the user_id exists
+    # TODO: error checking for user_id not in DB then redirect them to enter /alpaca command
+    try:
+        cur.execute(
+            'SELECT access_token FROM token_table WHERE user_id = %s', (user_id,))
+        access_token = cur.fetchone()[0]
+
+        print("Here's the access_token: ", access_token)
+        headers = {
+            'Authorization': 'Bearer ' + access_token
+        }
+        cur.close()
+        conn.close()
+    except(Exception, psycopg2.DatabaseError) as error:
+        print("Error getting access token: ", error)
+
+    # Try placing a buy order
+    try:
+        order = requests.post(
+            '{0}/v2/orders'.format(BASE_ALPACA_PAPER_URL), headers=headers, json={
+                'symbol': symbol,
+                'qty': qty,
+                'side': 'buy',
+                'type': 'market',
+                'time_in_force': 'gtc',
+            })
+
+    except Exception as e:
+        print("There was an issue posting order to Alpaca: {0}".format(e))
+
+    return Response("Buying"), 200
 
 
 @ app.route('/alpaca-sell', methods=['GET', 'POST'])
 def sell():
     data = request.form
     text = data['text'], lst = []
+    user_id = data['user_id']
     coms = text.split(), lst.append(coms)
     if lst.length() != 2:
-        return Response("error"), 400
-    symbol = coms[0], qty = coms[1]
+        return Response("Invalid number of arguments provided. Please check your buying arguments"), 400
+    else:
+        symbol = coms[0], qty = coms[1]
+
+    headers = {
+        'Authorization': 'Bearer ' + access_token
+    }
+    body = {
+        'symbol': symbol,
+        'qty': qty,
+        'side': 'buy',
+        'type': 'market',
+        'time_in_force': 'gtc'
+    }
+    # order = requests.post(
+    #     '{0}/v2/orders'.format(BASE_ALPACA_URL), headers=HEADERS, json={
+    #         'symbol': symbol,
+    #         'qty': qty,
+    #         'side': 'buy',
+    #         'type': type,
+    #         'time_in_force': time_in_force,
+    #     })
 
 
 def handleDisplayAccount(userID, token):
