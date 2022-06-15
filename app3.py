@@ -20,16 +20,10 @@ slackeventadapter = SlackEventAdapter(
 client = WebClient(token=config.SLACK_TOKEN)
 
 
-print("Connected to database")
-
-
-# cursor
-
-
 BOT_ID = client.api_call("auth.test")['user_id']
-BASE_TOKEN_URL = "https://api.alpaca.markets/oauth/token"
 
-user_id = ''
+# Authentication URL to retrieve access_token from Alpaca
+BASE_TOKEN_URL = "https://api.alpaca.markets/oauth/token"
 
 
 @app.route('/alpaca2', methods=['GET', 'POST'])
@@ -69,7 +63,6 @@ def auth():
     # If the auth code is not empty, then we can make the request to get the access token
     if auth_code != "":
         try:
-
             access_response = requests.post(BASE_TOKEN_URL, data={
                 'grant_type': 'authorization_code',
                 'code': auth_code,
@@ -113,10 +106,6 @@ def buy():
     if lst.length() != 2:
         return Response("error"), 400
     symbol = coms[0], qty = coms[1]
-    # if statement - confirm user has sufficient funds
-    # then execute trade
-    # else statement -
-    # then error
 
 
 @ app.route('/alpaca-sell', methods=['GET', 'POST'])
