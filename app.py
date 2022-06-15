@@ -55,23 +55,14 @@ def auth():
             'client_id': os.environ['ALPACA_CLIENT_ID'],
             'client_secret': os.environ['ALPACA_CLIENT_SECRET'],
             'redirect_uri': redirect_uri
-        })
-
+        }
+        #set user's authentication status to true
+        )
+    access_token = access_response.json()['access_token']
+    print(access_token + ' <---- this is the access token')
     return redirect("https://app.slack.com")
-    #     auth_token = request.args.get("access_token")
-    # if auth_token != "":
-    #     print(auth_token)
-    #     return Response(auth_token), 200
+   
 
-
-@app.route('/token', methods=['GET'])
-def token():
-    access_token = request.args.get("access_token")
-    print(access_token + 'this is the accesstoken')
-    if access_token != "":
-        return Response(access_token)
-    else:
-        return Response("no")
 @app.route('/alpaca-buy', methods=['GET', 'POST'])
 def buy():
     data = request.form
