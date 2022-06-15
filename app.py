@@ -18,16 +18,12 @@ client = slack.WebClient(token=os.environ['SLACK_TOKEN'])
 
 BOT_ID = client.api_call("auth.test")['user_id']
 BASE_TOKEN_URL = "https://api.alpaca.markets/oauth/token"
-NGROK = "https://53b3-50-208-212-121.ngrok.io"
+NGROK = "https://a272-152-44-181-213.ngrok.io"
 BASE_ALPACA_URL = 'https://paper-api.alpaca.markets/v2/orders'
 # BASE_ALPACA_URL = 'https://api.alpaca.markets'
-# HEADERS = {'APCA-API-KEY-ID': os.environ['ALPACA_API_KEY'],
-#            'APCA-API-SECRET-KEY': os.environ['ALPACA_SECRET_KEY']}
-
-conn = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME,
-                        user=config.DB_USER, password=config.DB_PASSWORD)
-
-cur = conn.cursor()       
+HEADERS = {'APCA-API-KEY-ID': os.environ['ALPACA_API_KEY'],
+           'APCA-API-SECRET-KEY': os.environ['ALPACA_SECRET_KEY']}
+   
 # Initializes your app with your bot token and signing secret
 
 
@@ -52,7 +48,8 @@ def alpaca():
 def auth():
     conn = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME,
                         user=config.DB_USER, password=config.DB_PASSWORD)
-    cur = conn.cursor()       
+    cur = conn.cursor()      
+    # need to check if already authenticated, gives error right now 
     auth_code = request.args.get("code")
     user_id = request.args.get("state")
     print(auth_code + 'this is the auth code')
@@ -80,48 +77,52 @@ def auth():
 @app.route('/alpaca-buy', methods=['GET', 'POST'])
 def buy():
     data = request.form
-    alpacaClient = alpaca.NewClient() 
     # verify user here
-    text = data['text'], lst = []
-    coms = text.split(), lst.append(coms)
-    if lst.length() != 2:
-        return Response("error"), 400
-    symbol = coms[0], qty = coms[1]
+    text = data['text']
+    print(text)
+    coms = text.split()
+    symbol = coms[0]
+    qty = coms[1]
     # if statement - confirm user has sufficient funds
     # then execute trade
-    # else statement - 
-    # then error 
-
-     try:
-        order = requests.post(
-            '{0}/v2/orders'.format(BASE_ALPACA_URL), headers=HEADERS, json={
-                'symbol': symbol,
-                'qty': qty,
-                'side': "buy",
-                'type': "market",
-                'time_in_force': "gtc",
-            })
-        print('Alpaca order reply status code: {0}'.format(
-            order.status_code))
-        if order.status_code != 200:
-            print("Undesirable response from Alpaca! {}".format(order.json()))
-            return False
-    except Exception as e:
-        logger.exception(
-            "There was an issue posting order to Alpaca: {0}".format(e))
-        return False
-    return order.json()
+    post_Alpaca_order('ethusd', 1, 'buy')
+    return Response('hello')
+ 
 
 @app.route('/alpaca-sell', methods=['GET', 'POST'])
 def sell():
     data = request.form
-    text = data['text'], lst = []
-    coms = text.split(), lst.append(coms)
+    text = data['text']
+    lst = []
+    coms = text.split()
+    lst.append(coms)
     
-    if lst.length() != 2:
+    if lst.length != 2:
         return Response("error"), 400
     symbol = coms[0], qty = coms[1]
 
+def post_Alpaca_order(symbol, qty, side, type1='market', time_in_force='gtc'):
+
+    try:
+        order = requests.post(
+            '{0}/v2/orders'.format(BASE_ALPACA_URL), headers=HEADERS, json={
+                'symbol': symbol,
+                'qty': int(qty),
+                'side': side,
+                'type': type1,
+                'time_in_force': time_in_force,
+            })
+        print('Alpaca order reply status code: {0}'.format(
+            order.status_code))
+        if order.status_code != 200:
+            print(
+                "Undesirable response from Alpaca! {}".format(order.json()))
+            return False
+    except Exception as e:
+        print(
+            "There was an issue posting order to Alpaca: {0}".format(e))
+        return False
+    return order.json()
 
 def handleDisplayAccount(userID, token):
     data = request.form()
