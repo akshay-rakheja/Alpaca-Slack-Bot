@@ -19,10 +19,8 @@ client = slack.WebClient(token=os.environ['SLACK_TOKEN'])
 BOT_ID = client.api_call("auth.test")['user_id']
 BASE_TOKEN_URL = "https://api.alpaca.markets/oauth/token"
 NGROK = "https://a272-152-44-181-213.ngrok.io"
-BASE_ALPACA_URL = 'https://paper-api.alpaca.markets/v2/orders'
+BASE_ALPACA_PAPER_URL = 'https://paper-api.alpaca.markets/v2/orders'
 # BASE_ALPACA_URL = 'https://api.alpaca.markets'
-HEADERS = {'APCA-API-KEY-ID': os.environ['ALPACA_API_KEY'],
-           'APCA-API-SECRET-KEY': os.environ['ALPACA_SECRET_KEY']}
    
 # Initializes your app with your bot token and signing secret
 
@@ -76,18 +74,59 @@ def auth():
 
 @app.route('/alpaca-buy', methods=['GET', 'POST'])
 def buy():
+    try:
+        # connect to db
+        conn = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME,
+                                user=config.DB_USER, password=config.DB_PASSWORD)
+        # Open Cursor
+        cur = conn.cursor()
+    except:
+        print("Error connecting to DB")
+
     data = request.form
-    # verify user here
-    text = data['text']
-    print(text)
-    coms = text.split()
-    symbol = coms[0]
-    qty = coms[1]
-    # if statement - confirm user has sufficient funds
-    # then execute trade
-    post_Alpaca_order('ethusd', 1, 'buy')
-    return Response('hello')
- 
+
+    # Retrieve command args and verify user here
+    # TODO: error checking for bad args
+    try:
+        text = data['text']
+        user_id = data['user_id']
+        params = text.split()
+        symbol = params[0]
+        qty = params[1]
+    except:
+        print("Error getting data from slash command, perhaps missing/incorrect args")
+
+    # Get the access token from DB if the user_id exists
+    # TODO: error checking for user_id not in DB then redirect them to enter /alpaca command
+    try:
+        cur.execute(
+            'SELECT access_token FROM token WHERE user_id = %s', (user_id,))
+        access_token = cur.fetchone()[0]
+
+        print("Here's the access_token: ", access_token)
+        headers = {
+            'Authorization': 'Bearer ' + access_token
+        }
+        cur.close()
+        conn.close()
+    except(Exception, psycopg2.DatabaseError) as error:
+        print("Error getting access token: ", error)
+
+    # Try placing a buy order
+    try:
+        order = requests.post(
+            '{0}/v2/orders'.format(BASE_ALPACA_PAPER_URL), headers=headers, json={
+                'symbol': symbol,
+                'qty': int(qty),
+                'side': 'buy',
+                'type': 'market',
+                'time_in_force': 'gtc',
+            })
+
+    except Exception as e:
+        print("There was an issue posting order to Alpaca: {0}".format(e))
+
+    return Response("Buying"), 200
 
 @app.route('/alpaca-sell', methods=['GET', 'POST'])
 def sell():
@@ -100,29 +139,6 @@ def sell():
     if lst.length != 2:
         return Response("error"), 400
     symbol = coms[0], qty = coms[1]
-
-def post_Alpaca_order(symbol, qty, side, type1='market', time_in_force='gtc'):
-
-    try:
-        order = requests.post(
-            '{0}/v2/orders'.format(BASE_ALPACA_URL), headers=HEADERS, json={
-                'symbol': symbol,
-                'qty': int(qty),
-                'side': side,
-                'type': type1,
-                'time_in_force': time_in_force,
-            })
-        print('Alpaca order reply status code: {0}'.format(
-            order.status_code))
-        if order.status_code != 200:
-            print(
-                "Undesirable response from Alpaca! {}".format(order.json()))
-            return False
-    except Exception as e:
-        print(
-            "There was an issue posting order to Alpaca: {0}".format(e))
-        return False
-    return order.json()
 
 def handleDisplayAccount(userID, token):
     data = request.form()
