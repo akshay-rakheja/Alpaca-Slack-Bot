@@ -38,9 +38,9 @@ def alpaca():
         "&redirect_uri=" + NGROK + "/auth&scope=account:write%20trading%20data&state=" + user_id), 200
     elif text == "connect" and access_token != "":
         return Response("You are already authenticated! Try out our other commands -> /alpaca-buy | /alpaca-sell | /alpaca account | /alpaca positions")
-    elif text == "account":
+    elif text == "account" and access_token != "":
         return AccountInfo(user_id)
-    elif text == "positions":
+    elif text == "positions" and access_token != "":
         return GetPositions(user_id)
     else:
         return Response("Invalid Command -> try 'connect', 'account', or 'positions'")
@@ -174,8 +174,7 @@ def GetPositions(user_id):
         list_positions['symbols'].append(pos['symbol'])
         list_positions['current_price'].append(pos['current_price'])
 
-    print(list_positions)
-    return Response(list_positions), 200
+    return Response(print(list_positions)), 200
 
 ## HELPER FUNCTIONS BELOW
 def connect_DB():
