@@ -66,37 +66,53 @@ def alpaca():
 
 @app.route('/auth', methods=['GET', 'POST'])
 def auth():
+    # connect to db
     conn = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME,
                             user=config.DB_USER, password=config.DB_PASSWORD)
+    # Open Cursor
     cur = conn.cursor()
+
+    # Retrieve auth_code and user_id from request
     auth_code = request.args.get("code")
     user_id = request.args.get("state")
     print(request.args)
     print(auth_code + ' <---- this is the auth code')
-    if auth_code != "":
-        access_response = requests.post(BASE_TOKEN_URL, data={
-            'grant_type': 'authorization_code',
-            'code': auth_code,
-            'client_id': config.ALPACA_CLIENT_ID,
-            'client_secret': config.ALPACA_CLIENT_SECRET,
-            'redirect_uri': 'https://0c0a-192-159-178-211.ngrok.io/auth'
-        })
-    access_token = access_response.json()['access_token']
-    print(access_token + ' <---- this is the access token')
 
+    # If the auth code is not empty, then we can make the request to get the access token
+    if auth_code != "":
+        try:
+
+            access_response = requests.post(BASE_TOKEN_URL, data={
+                'grant_type': 'authorization_code',
+                'code': auth_code,
+                'client_id': config.ALPACA_CLIENT_ID,
+                'client_secret': config.ALPACA_CLIENT_SECRET,
+                'redirect_uri': 'https://0c0a-192-159-178-211.ngrok.io/auth'
+            })
+        except:
+            print("Error sending request to get access token")
+
+    # retrieve the auth token from the response
+    try:
+        access_token = access_response.json()['access_token']
+    except:
+        print("Error getting access token")
+
+    print(access_token + ' <---- this is the access token')
     print(user_id + ' <---- this is the user id')
-    if access_token != "":
-        print("we hit access_token!!!!!")
-        cur.execute(
-            'insert into token_table (user_id, access_token) values (%s,%s)', (user_id, access_token))
-        conn.commit()
-    cur.close()
-    conn.close()
+
+    # If the access token and user_id are not empty, add them to DB
+    try:
+        if access_token != "" and user_id != "":
+            print("we hit access_token!!!!!")
+            cur.execute(
+                'insert into token_table (user_id, access_token) values (%s,%s)', (user_id, access_token))
+            conn.commit()
+        cur.close()
+        conn.close()
+    except:
+        print("Error adding token to DB maybe because user_id already exists")
     return redirect("https://app.slack.com")
-    #     auth_token = request.args.get("access_token")
-    # if auth_token != "":
-    #     print(auth_token)
-    #     return Response(auth_token), 200
 
 
 @app.route('/alpaca-buy', methods=['GET', 'POST'])
