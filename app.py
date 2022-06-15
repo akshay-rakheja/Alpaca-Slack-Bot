@@ -35,10 +35,13 @@ def alpaca():
     if text == "connect":
         return Response("https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969" + 
         "&redirect_uri=" + NGROK + "/auth&scope=account:write%20trading%20data&state=" + user_id), 200
-    # elif text == "display":
-    #     return Response(handleDisplayAccount(user_id, 0)), 200
     elif text == "account":
-        return Response("NO")
+        return AccountInfo(user_id)
+    elif text == "positions":
+        return GetPositions(user_id)
+    else:
+        return Response("Invalid Command -> try 'connect', 'account', or 'positions'")
+        
 
 @app.route('/auth', methods=['GET', 'POST'])
 def auth():
@@ -114,15 +117,9 @@ def sell():
     else:
         return Response("Error selling"), 200
 
-
-@app.route('/alpaca-account', methods=['GET', 'POST'])
-def AccountInfo():
+def AccountInfo(user_id):
     # Try to connect to DB
     cur, conn = connect_DB()
-
-    data = request.form
-
-    user_id = data['user_id']
 
     # Get the access token from DB if the user_id exists
     access_token = get_AccessToken(cur, conn, user_id)
@@ -149,13 +146,8 @@ def AccountInfo():
     print("THIS IS THE MESSAGE----> " + message)
     return Response(message), 200
 
-@app.route('/alpaca-positions', methods=['GET', 'POST'])
-def get_positions():
+def GetPositions(user_id):
     cur, conn = connect_DB()
-
-    data = request.form
-
-    user_id = data['user_id']
 
     # Get the access token from DB if the user_id exists
     access_token = get_AccessToken(cur, conn, user_id)
