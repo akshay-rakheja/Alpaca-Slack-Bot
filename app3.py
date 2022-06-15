@@ -136,7 +136,7 @@ def sell():
     # Retrieve the user_id and text from slash command
     symbol, qty, user_id = get_params(data)
 
-    # Get the access token from DB if the user_id exists
+    # Get the access token from DB if the user_id exists and close the DB connection
     access_token = get_AccessToken(cur, conn, user_id)
 
     headers = {'Authorization': 'Bearer ' + access_token}
@@ -151,28 +151,40 @@ def sell():
 
 
 @app.route('/alpaca2-accountInfo', methods=['GET', 'POST'])
-def displayAccountInfo():
-    data = request.form()
+def AccountInfo():
+
+    # Try to connect to DB
+    cur, conn = connect_DB()
+
+    data = request.form
+
     user_id = data['user_id']
 
-    accountInfo = requests.post(
+    # Get the access token from DB if the user_id exists
+    access_token = get_AccessToken(cur, conn, user_id)
+
+    headers = {'Authorization': 'Bearer ' + access_token}
+
+    accountInfo = requests.get(
         '{0}/v2/account'.format(BASE_ALPACA_PAPER_URL), headers=headers)
 
+    accountInfo = accountInfo.json()
+    print(accountInfo)
     # gather the values from account
     commands = {
-        "an": account.Accountnumber,
-        "eq": "$" + account.Equity.String(),
-        "lmv": "$" + account.LongMarketValue.String(),
-        "smv": "$" + account.ShortMarketValue.String(),
-        "ct": "$" + account.Equity.Sub(account.LastEquity).String(),
-        "bp": "$" + account.BuyingPower.String()
+        "an": accountInfo['account_number'],
+        "eq": "$" + accountInfo['equity'],
+        "lmv": "$" + accountInfo['long_market_value'],
+        "smv": "$" + accountInfo['short_market_value'],
+        "ct": "$" + str(float(accountInfo['equity'])-float(accountInfo['last_equity'])),
+        "bp": "$" + accountInfo['buying_power']
     }
 
     # display the account values
     message = "Account Number: {} | Equity: {} | Long Market Value {} | Short Market Value {} | Change Today {} | Buying Power {} ".format(
         commands["an"], commands["eq"], commands["lmv"], commands["smv"], commands["ct"], commands["bp"])
-
-    return message
+    print("THIS IS THE MESSAGE----> " + message)
+    return Response(message), 200
 
 
 def connect_DB():
