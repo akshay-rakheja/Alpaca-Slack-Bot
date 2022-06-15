@@ -32,9 +32,12 @@ def alpaca():
     text = data['text'] 
     user_id = data['user_id']
     access_token = get_AccessToken(cur, conn, user_id)
-    if text == "connect":
+    
+    if text == "connect" and access_token == "":
         return Response("https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969" + 
         "&redirect_uri=" + NGROK + "/auth&scope=account:write%20trading%20data&state=" + user_id), 200
+    elif text == "connect" and access_token != "":
+        return Response("You are already authenticated! Try out our other commands -> /alpaca-buy | /alpaca-sell | /alpaca account | /alpaca positions")
     elif text == "account":
         return AccountInfo(user_id)
     elif text == "positions":
