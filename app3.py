@@ -20,43 +20,30 @@ slackeventadapter = SlackEventAdapter(
 client = WebClient(token=config.SLACK_TOKEN)
 
 
-print("Connected to database")
-
-
-# cursor
-
-
 BOT_ID = client.api_call("auth.test")['user_id']
+
+# Authentication URL to retrieve access_token from Alpaca
 BASE_TOKEN_URL = "https://api.alpaca.markets/oauth/token"
 
-user_id = ''
+
+# Alpaca API endpoints
+BASE_ALPACA_PAPER_URL = 'https://paper-api.alpaca.markets'
+BASE_ALPACA_LIVE_URL = 'https://api.alpaca.markets'
 
 
 @app.route('/alpaca2', methods=['GET', 'POST'])
 def alpaca():
-
-    # connect to db
-    conn = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME,
-                            user=config.DB_USER, password=config.DB_PASSWORD)
-    cur = conn.cursor()
+    # Retrieve the user_id and text from slash command
     data = request.form
-    team_id = data['team_id']
-    channel_id = data['channel_id']
     text = data['text']
     user_id = data['user_id']
-    print(team_id, channel_id, user_id)
-    # if user_id != "":
-    #     cur.execute(
-    #         'insert into token_table (user_id, access_token) values (%s,%s)', (user_id, text))
-    #     conn.commit()
-    #     cur.close()
-    #     conn.close()
+    print(user_id)
 
     url = "https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=1d5c0276b371931fdf8077209a90e460" + \
         "&redirect_uri=https://0c0a-192-159-178-211.ngrok.io/auth&scope=account:write%20trading%20data&state="+user_id
     print(url)
+    # if the user mentions connect with /alpaca, redirect to alpaca login
     if text == "connect":
-        # client.chat_postEphemeral("https://api.alpaca.markets/oauth/grant_type=authorization_code&code=67f74f5a-a2cc-4ebd-88b4-22453fe07994&client_id=fc9c55efa3924f369d6c1148e668bbe8&client_secret=5b8027074d8ab434882c0806833e76508861c366&redirect_uri=https://example.com/oauth/callback")
         return Response(url), 200
     elif text == "display":
         return Response(handleDisplayAccount(user_id, 0)), 200
@@ -81,7 +68,6 @@ def auth():
     # If the auth code is not empty, then we can make the request to get the access token
     if auth_code != "":
         try:
-
             access_response = requests.post(BASE_TOKEN_URL, data={
                 'grant_type': 'authorization_code',
                 'code': auth_code,
@@ -115,30 +101,98 @@ def auth():
     return redirect("https://app.slack.com")
 
 
-@app.route('/alpaca-buy', methods=['GET', 'POST'])
+@app.route('/alpaca2-buy', methods=['GET', 'POST'])
 def buy():
+
+    # Try to connect to DB
+    try:
+        # connect to db
+        conn = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME,
+                                user=config.DB_USER, password=config.DB_PASSWORD)
+        # Open Cursor
+        cur = conn.cursor()
+    except:
+        print("Error connecting to DB")
+
     data = request.form
-    alpacaClient = alpaca.NewClient()
-    # verify user here
-    text = data['text'], lst = []
-    coms = text.split(), lst.append(coms)
-    if lst.length() != 2:
-        return Response("error"), 400
-    symbol = coms[0], qty = coms[1]
-    # if statement - confirm user has sufficient funds
-    # then execute trade
-    # else statement -
-    # then error
+
+    # Retrieve command args and verify user here
+    # TODO: error checking for bad args
+    try:
+        text = data['text']
+        lst = []
+        user_id = data['user_id']
+        params = text.split()
+        symbol = params[0]
+        qty = params[1]
+        print(symbol + ' <---- this is the symbol')
+        print(qty + ' <---- this is the qty')
+        print(user_id + ' <---- this is the user id')
+    except:
+        print("Error getting data from slash command, perhaps missing/incorrect args")
+
+    # Get the access token from DB if the user_id exists
+    # TODO: error checking for user_id not in DB then redirect them to enter /alpaca command
+    try:
+        cur.execute(
+            'SELECT access_token FROM token_table WHERE user_id = %s', (user_id,))
+        access_token = cur.fetchone()[0]
+
+        print("Here's the access_token: ", access_token)
+        headers = {
+            'Authorization': 'Bearer ' + access_token
+        }
+        cur.close()
+        conn.close()
+    except(Exception, psycopg2.DatabaseError) as error:
+        print("Error getting access token: ", error)
+
+    # Try placing a buy order
+    try:
+        order = requests.post(
+            '{0}/v2/orders'.format(BASE_ALPACA_PAPER_URL), headers=headers, json={
+                'symbol': symbol,
+                'qty': qty,
+                'side': 'buy',
+                'type': 'market',
+                'time_in_force': 'gtc',
+            })
+
+    except Exception as e:
+        print("There was an issue posting order to Alpaca: {0}".format(e))
+
+    return Response("Buying"), 200
 
 
 @ app.route('/alpaca-sell', methods=['GET', 'POST'])
 def sell():
     data = request.form
     text = data['text'], lst = []
+    user_id = data['user_id']
     coms = text.split(), lst.append(coms)
     if lst.length() != 2:
-        return Response("error"), 400
-    symbol = coms[0], qty = coms[1]
+        return Response("Invalid number of arguments provided. Please check your buying arguments"), 400
+    else:
+        symbol = coms[0], qty = coms[1]
+
+    headers = {
+        'Authorization': 'Bearer ' + access_token
+    }
+    body = {
+        'symbol': symbol,
+        'qty': qty,
+        'side': 'buy',
+        'type': 'market',
+        'time_in_force': 'gtc'
+    }
+    # order = requests.post(
+    #     '{0}/v2/orders'.format(BASE_ALPACA_URL), headers=HEADERS, json={
+    #         'symbol': symbol,
+    #         'qty': qty,
+    #         'side': 'buy',
+    #         'type': type,
+    #         'time_in_force': time_in_force,
+    #     })
 
 
 def handleDisplayAccount(userID, token):
