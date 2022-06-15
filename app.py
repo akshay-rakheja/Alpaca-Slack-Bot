@@ -4,7 +4,8 @@ from dotenv import load_dotenv
 from flask import Flask, request, Response, jsonify, abort, redirect
 from slackeventsapi import SlackEventAdapter
 import alpaca_trade_api as alpaca
-
+import config
+import psycopg2
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -22,6 +23,10 @@ NGROK = "https://53b3-50-208-212-121.ngrok.io"
 # HEADERS = {'APCA-API-KEY-ID': os.environ['ALPACA_API_KEY'],
 #            'APCA-API-SECRET-KEY': os.environ['ALPACA_SECRET_KEY']}
 
+conn = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME,
+                        user=config.DB_USER, password=config.DB_PASSWORD)
+
+cur = conn.cursor()       
 # Initializes your app with your bot token and signing secret
 
 
@@ -36,14 +41,14 @@ def alpaca():
     if text == "connect":
         #client.chat_postEphemeral("https://api.alpaca.markets/oauth/grant_type=authorization_code&code=67f74f5a-a2cc-4ebd-88b4-22453fe07994&client_id=fc9c55efa3924f369d6c1148e668bbe8&client_secret=5b8027074d8ab434882c0806833e76508861c366&redirect_uri=https://example.com/oauth/callback")
         return Response("https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969" + 
-        "&redirect_uri=" + NGROK + "/auth&scope=account:write%20trading%20data"), 200 
+        "&redirect_uri=" + NGROK + "/auth&scope=account:write%20trading%20data"), user_id
     elif text == "display":
         return Response(handleDisplayAccount(user_id, 0)), 200
     elif text == "":
         return Response("HI"), 200
 
 @app.route('/auth', methods=['GET', 'POST'])
-def auth():
+def auth(user_id):
     dictionary = {}
     auth_code = request.args.get("code")
     print(auth_code + 'this is the auth code')
@@ -60,6 +65,12 @@ def auth():
         )
     access_token = access_response.json()['access_token']
     print(access_token + ' <---- this is the access token')
+    if access_token != "":
+        cur.execute('insert into token_table (user_id, access_token) values (%s, %s)', (
+            user_id, access_token))
+        conn.commit()
+        cur.close()
+        conn.close()
     return redirect("https://app.slack.com")
    
 
