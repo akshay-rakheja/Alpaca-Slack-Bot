@@ -34,29 +34,17 @@ user_id = ''
 
 @app.route('/alpaca2', methods=['GET', 'POST'])
 def alpaca():
-
-    # connect to db
-    conn = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME,
-                            user=config.DB_USER, password=config.DB_PASSWORD)
-    cur = conn.cursor()
+    # Retrieve the user_id and text from slash command
     data = request.form
-    team_id = data['team_id']
-    channel_id = data['channel_id']
     text = data['text']
     user_id = data['user_id']
-    print(team_id, channel_id, user_id)
-    # if user_id != "":
-    #     cur.execute(
-    #         'insert into token_table (user_id, access_token) values (%s,%s)', (user_id, text))
-    #     conn.commit()
-    #     cur.close()
-    #     conn.close()
+    print(user_id)
 
     url = "https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=1d5c0276b371931fdf8077209a90e460" + \
         "&redirect_uri=https://0c0a-192-159-178-211.ngrok.io/auth&scope=account:write%20trading%20data&state="+user_id
     print(url)
+    # if the user mentions connect with /alpaca, redirect to alpaca login
     if text == "connect":
-        # client.chat_postEphemeral("https://api.alpaca.markets/oauth/grant_type=authorization_code&code=67f74f5a-a2cc-4ebd-88b4-22453fe07994&client_id=fc9c55efa3924f369d6c1148e668bbe8&client_secret=5b8027074d8ab434882c0806833e76508861c366&redirect_uri=https://example.com/oauth/callback")
         return Response(url), 200
     elif text == "display":
         return Response(handleDisplayAccount(user_id, 0)), 200
