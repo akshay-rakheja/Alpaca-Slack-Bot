@@ -131,7 +131,8 @@ def buy():
 
     # Get the access token from DB if the user_id exists
     access_token = get_AccessToken(cur, conn, user_id)
-
+    if access_token == None:
+        return Response('You must connect your account with Alpaca by authenticating first. Use /alpaca connect to connect your Alpaca account with Slack.'), 200
     headers = {'Authorization': 'Bearer ' + access_token}
 
     # Try placing a buy order
@@ -155,6 +156,9 @@ def sell():
 
     # Get the access token from DB if the user_id exists and close the DB connection
     access_token = get_AccessToken(cur, conn, user_id)
+
+    if access_token == None:
+        return Response('You must connect your account with Alpaca by authenticating first. Use /alpaca connect to connect your Alpaca account with Slack.'), 200
 
     headers = {'Authorization': 'Bearer ' + access_token}
 
@@ -192,10 +196,9 @@ def get_AccessToken(cur, conn, user_id):
         access_token = cur.fetchone()[0]
         cur.close()
         conn.close()
+        return access_token
     except(Exception, psycopg2.DatabaseError) as error:
         print("Error getting access token: ", error)
-
-    return access_token
 
 
 def get_params(data):
