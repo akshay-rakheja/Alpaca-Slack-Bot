@@ -311,7 +311,8 @@ def printIt(prepend, dictionary):
     stuff = ''
     stuff = stuff + prepend
     for key, value in dictionary.items():
-        stuff += str(key) + ':\t' + str(value[0]) + '\t' + str(value[1]) + '\n'
+        stuff += str(key) + '\t|\t' + \
+            str(value[0]) + '\t|\t' + str(value[1]) + '\n'
     return stuff
 
 
