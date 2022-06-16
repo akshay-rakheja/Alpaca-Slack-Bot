@@ -33,17 +33,27 @@ def alpaca():
     user_id = data['user_id']
     access_token = get_AccessToken(cur, conn, user_id)
     
-    if text == "connect" and access_token == "":
-        return Response("https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969" + 
+    if text == '':
+        return Response("Please enter a command. Possible commands are: \n /alpaca connect : Connect your Alpaca account with Slack,\n /alpaca disonnect: Disconnect your Alpaca account from Slack,\n /alpaca-buy SYMBOL QTY: Place a BUY order on Alpaca for a given SYMBOL and QTY,\n  /alpaca-sell SYMBOL QTY: Place a SELL order on Alpaca for a given SYMBOL and QTY, /alpaca positions: Get your current positions on Alpaca,\n /alpaca orders: Get Open orders,\n /alpaca status: Connection status between Alpaca and Slack\n"), 200
+    elif text == "connect" and access_token == None:
+        return Response("Please follow the link to authorize this application to connect to your Alpaca account: https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969" + 
         "&redirect_uri=" + NGROK + "/auth&scope=account:write%20trading%20data&state=" + user_id), 200
     elif text == "connect" and access_token != "":
         return Response("You are already authenticated! Try out our other commands -> /alpaca-buy | /alpaca-sell | /alpaca account | /alpaca positions")
-    elif text == "account" and access_token != "":
+    elif text == "disconnect" and access_token != None:
+        disconnectUser(user_id)
+        return Response("Your Alpaca account has been disconnected. Re-connect to Alpaca by typing /alpaca connect"), 200
+    elif text == "account" and access_token != None:
         return AccountInfo(user_id)
-    elif text == "positions" and access_token != "":
+    elif text == "positions" and access_token != None:
         return GetPositions(user_id)
-    elif text == "orders" and access_token != "":
+    elif text == "orders" and access_token != None:
         return GetOrders(user_id)
+    elif text == 'status' and access_token != None:
+        print('Checking STATUS!!!!!!!!!')
+        return Response("Your Alpaca account is connected!")
+    elif text == 'status' and access_token == None:
+        return Response("Your Alpaca account is not connected!. Please try connecting using '/alpaca connect' command.")
     else:
         return Response("Invalid Command -> try 'connect', 'account', or 'positions'")
         
@@ -78,6 +88,7 @@ def auth():
 
 @app.route('/alpaca-buy', methods=['GET', 'POST'])
 def buy():
+    # Try to connect to DB
     cur, conn = connect_DB()
 
     data = request.form
@@ -92,9 +103,9 @@ def buy():
 
     # Try placing a buy order
     order = placeOrder(symbol, qty, 'buy', headers)
-
-    if order.status_code == 200 and order.json()['status'] == 'accepted':
-        return Response(f'Bought {qty} {symbol} on Alpaca!'), 200
+    order_status = order.json()['status']
+    if order.status_code == 200:
+        return Response(f'Bought {qty} {symbol} on Alpaca. Order Status: {order_status}'), 200
     else:
         return Response("Error buying"), 200
 
@@ -117,10 +128,12 @@ def sell():
     # Try placing a sell order
     order = placeOrder(symbol, qty, 'sell', headers)
 
-    if order.status_code == 200 and order.json()['status'] == 'accepted':
-        return Response(f'Sold {qty} {symbol} on Alpaca!'), 200
+    order_status = order.json()['status']
+
+    if order.status_code == 200:
+        return Response(f'Sold {qty} {symbol} on Alpaca. Order Status: {order_status}. If it is pending_new, it will settle momentarily. You can check for any open order through "/alpaca orders" command'), 200
     else:
-        return Response("Error selling"), 200
+        return Response("Error buying"), 200
 
 def AccountInfo(user_id):
     # Try to connect to DB
@@ -165,18 +178,14 @@ def GetPositions(user_id):
 
     # Store the Json object and set up dictionary for display
     positions = positions.json()
-
-    list_positions = {
-        'symbols' : [], 
-        'current_price' : [] 
-    }
-    
-    # Format each position within positions
+    positions_list = {}
     for pos in positions:
-        list_positions['symbols'].append(pos['symbol'])
-        list_positions['current_price'].append(pos['current_price'])
+        positions_list[pos['symbol']] = [pos['qty'], pos['unrealized_pl']]
 
-    return Response(print(list_positions)), 200
+    prepend = 'Positions:\n\nSymbol\t|\tQty\t|\tUnrealized P/L\n'
+    positions_string = printIt(prepend, positions_list)
+
+    return Response(positions_string), 200
 
 def GetOrders(user_id):
     cur, conn = connect_DB()
@@ -207,19 +216,16 @@ def connect_DB():
 
 def get_AccessToken(cur, conn, user_id):
     # Get the access token from DB if the user_id exists
-    # TODO: error checking for user_id not in DB then redirect them to enter /alpaca command
     try:
         cur.execute(
             'SELECT access_token FROM token WHERE user_id = %s', (user_id,))
-        access_token = cur.fetchone()[0]
 
-        print("Here's the access_token: ", access_token)
+        access_token = cur.fetchone()[0]
         cur.close()
         conn.close()
+        return access_token
     except(Exception, psycopg2.DatabaseError) as error:
         print("Error getting access token: ", error)
-
-    return access_token
 
 
 def get_params(data):
@@ -229,7 +235,7 @@ def get_params(data):
         text = data['text']
         user_id = data['user_id']
         params = text.split()
-        symbol = params[0]
+        symbol = params[0].upper()
         qty = params[1]
         print(symbol + ' <---- this is the symbol')
         print(qty + ' <---- this is the qty')
@@ -257,6 +263,26 @@ def placeOrder(symbol, qty, side, headers):
 
     return order
 
+def disconnectUser(user_id):
+    cur, conn = connect_DB()
+    try:
+        cur.execute(
+            'DELETE FROM token WHERE user_id = %s', (user_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except(Exception, psycopg2.DatabaseError) as error:
+        print("Error removing user and access token: ", error)
+
+
+def printIt(prepend, dictionary):
+
+    stuff = ''
+    stuff = stuff + prepend
+    for key, value in dictionary.items():
+        stuff += str(key) + '\t|\t' + \
+            str(value[0]) + '\t|\t' + str(value[1]) + '\n'
+    return stuff
 
 # Start your app
 if __name__ == "__main__":
