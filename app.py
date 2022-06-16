@@ -74,7 +74,7 @@ def Condition(text, user_id, live, access_token, data):
         return Response("Your Alpaca account is connected!")
     
     elif len(text.split()) > 1 and access_token != None:
-        print("Trading")
+        print(access_token)
         return trade(data, live)
     elif text == 'status' and access_token == None:
         return Response("Your Alpaca account is not connected!. Please try connecting using '/alpaca connect' command.")
@@ -126,6 +126,7 @@ def trade(data, live):
     # Try placing a buy order
 
     order = placeOrder(symbol, qty, side, headers, live)
+    print(order.json())
     order_status = order.json()['status']
     if order.status_code == 200:
         if side == 'buy':
@@ -267,6 +268,7 @@ def placeOrder(symbol, qty, side, headers, live):
                     'type': 'market',
                     'time_in_force': 'gtc',
                 })
+
         else:
             order = requests.post(
                 '{0}/v2/orders'.format(BASE_ALPACA_LIVE_URL), headers=headers, json={
@@ -276,11 +278,12 @@ def placeOrder(symbol, qty, side, headers, live):
                     'type': 'market',
                     'time_in_force': 'gtc',
                 })
-            
-    except Exception as e:
-        print("There was an issue posting order to Alpaca: {0}".format(e))
+        
+        return order
 
-    return order
+    except Exception as e:
+        return Response("There was an issue posting order to Alpaca: {0}".format(e))
+        
 
 def disconnectUser(user_id):
     cur, conn = connect_DB()
