@@ -100,8 +100,8 @@ def auth():
     except:
         print("Error getting access token")
 
-    print(access_token + ' <---- this is the access token')
-    print(user_id + ' <---- this is the user id')
+    # print(access_token + ' <---- this is the access token')
+    # print(user_id + ' <---- this is the user id')
 
     # If the access token and user_id are not empty, add them to DB
     try:
@@ -189,14 +189,7 @@ def get_AccessToken(cur, conn, user_id):
         cur.execute(
             'SELECT access_token FROM token_table WHERE user_id = %s', (user_id,))
 
-        # if access_token == None:
-        #     return None
-        # else:
-
-        access_token = cur.fetchone()
-        print(access_token)
-
-        print("Here's the access_token: ", access_token)
+        access_token = cur.fetchone()[0]
         cur.close()
         conn.close()
     except(Exception, psycopg2.DatabaseError) as error:
@@ -260,7 +253,7 @@ def GetPositions(user_id):
     for pos in positions:
         positions_list[pos['symbol']] = [pos['qty'], pos['unrealized_pl']]
 
-    prepend = 'Symbol\t|\tQty\t|\tUnrealized P/L\n'
+    prepend = 'Positions:\n\nSymbol\t|\tQty\t|\tUnrealized P/L\n'
     positions_string = printIt(prepend, positions_list)
 
     return Response(positions_string), 200
