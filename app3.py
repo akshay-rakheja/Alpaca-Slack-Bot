@@ -31,6 +31,9 @@ BASE_ALPACA_PAPER_URL = 'https://paper-api.alpaca.markets'
 BASE_ALPACA_LIVE_URL = 'https://api.alpaca.markets'
 
 
+NGROK = "https://eadf-192-159-178-211.ngrok.io"
+
+
 @app.route('/alpaca2', methods=['GET', 'POST'])
 def alpaca():
     cur, conn = connect_DB()
@@ -39,28 +42,38 @@ def alpaca():
     user_id = data['user_id']
     access_token = get_AccessToken(cur, conn, user_id)
 
-    if text == "connect" and access_token == "":
-        return Response("https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969" +
+    # if access_token == None:
+    #     return Response("You must connect your account with Alpaca by authenticating first. Use /alpaca connect to connect your Alpaca account with Slack."), 200
+    if text == '':
+        return Response("Please enter a command. Possible commands are: \n /alpaca connect : Connect your Alpaca account with Slack,\n /alpaca disonnect: Disconnect your Alpaca account from Slack,\n /alpaca-buy SYMBOL QTY: Place a BUY order on Alpaca for a given SYMBOL and QTY,\n  /alpaca-sell SYMBOL QTY: Place a SELL order on Alpaca for a given SYMBOL and QTY, /alpaca positions: Get your current positions on Alpaca,\n /alpaca orders: Get Open orders,\n /alpaca status: Connection status between Alpaca and Slack\n"), 200
+    elif text == "connect" and access_token == None:
+        return Response("Please follow the link to authorize this application to connect to your Alpaca account:\nhttps://app.alpaca.markets/oauth/authorize?response_type=code&client_id=1d5c0276b371931fdf8077209a90e460" +
                         "&redirect_uri=" + NGROK + "/auth&scope=account:write%20trading%20data&state=" + user_id), 200
     elif text == "connect" and access_token != "":
         return Response("You are already authenticated! Try out our other commands -> /alpaca-buy | /alpaca-sell | /alpaca account | /alpaca positions")
-    elif text == "account" and access_token != "":
+    elif text == "disconnect" and access_token != None:
+        disconnectUser(user_id)
+        return Response("Your Alpaca account has been disconnected. Re-connect to Alpaca by typing /alpaca connect"), 200
+    elif text == "account" and access_token != None:
         return AccountInfo(user_id)
-    elif text == "positions" and access_token != "":
+    elif text == "positions" and access_token != None:
         return GetPositions(user_id)
-    elif text == "orders" and access_token != "":
+    elif text == "orders" and access_token != None:
         return GetOrders(user_id)
+    elif text == 'status' and access_token != None:
+        print('Checking STATUS!!!!!!!!!')
+        return Response("Your Alpaca account is connected!")
+    elif text == 'status' and access_token == None:
+        return Response("Your Alpaca account is not connected!. Please try connecting using '/alpaca connect' command.")
     else:
         return Response("Invalid Command -> try 'connect', 'account', or 'positions'")
 
 
 @app.route('/auth', methods=['GET', 'POST'])
 def auth():
-    # connect to db
-    conn = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME,
-                            user=config.DB_USER, password=config.DB_PASSWORD)
-    # Open Cursor
-    cur = conn.cursor()
+
+    # Connect to DB
+    cur, conn = connect_DB()
 
     # Retrieve auth_code and user_id from request
     auth_code = request.args.get("code")
@@ -76,7 +89,7 @@ def auth():
                 'code': auth_code,
                 'client_id': config.ALPACA_CLIENT_ID,
                 'client_secret': config.ALPACA_CLIENT_SECRET,
-                'redirect_uri': 'https://0c0a-192-159-178-211.ngrok.io/auth'
+                'redirect_uri': NGROK+'/auth'
             })
         except:
             print("Error sending request to get access token")
@@ -101,7 +114,8 @@ def auth():
         conn.close()
     except:
         print("Error adding token to DB maybe because user_id already exists")
-    return redirect("https://app.slack.com")
+
+    return redirect("https://app.slack.com"), 200
 
 
 @app.route('/alpaca2-buy', methods=['GET', 'POST'])
@@ -171,11 +185,16 @@ def connect_DB():
 
 def get_AccessToken(cur, conn, user_id):
     # Get the access token from DB if the user_id exists
-    # TODO: error checking for user_id not in DB then redirect them to enter /alpaca command
     try:
         cur.execute(
             'SELECT access_token FROM token_table WHERE user_id = %s', (user_id,))
-        access_token = cur.fetchone()[0]
+
+        # if access_token == None:
+        #     return None
+        # else:
+
+        access_token = cur.fetchone()
+        print(access_token)
 
         print("Here's the access_token: ", access_token)
         cur.close()
@@ -301,6 +320,18 @@ def printIt(prepend, dictionary):
     for key, value in dictionary.items():
         stuff += str(key) + ':\t' + str(value[0]) + '\t' + str(value[1]) + '\n'
     return stuff
+
+
+def disconnectUser(user_id):
+    cur, conn = connect_DB()
+    try:
+        cur.execute(
+            'DELETE FROM token_table WHERE user_id = %s', (user_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except(Exception, psycopg2.DatabaseError) as error:
+        print("Error removing user and access token: ", error)
 
 
 # Start your app
