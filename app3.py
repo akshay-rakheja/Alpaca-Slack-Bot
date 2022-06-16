@@ -33,22 +33,25 @@ BASE_ALPACA_LIVE_URL = 'https://api.alpaca.markets'
 
 @app.route('/alpaca2', methods=['GET', 'POST'])
 def alpaca():
-    # Retrieve the user_id and text from slash command
+    cur, conn = connect_DB()
     data = request.form
     text = data['text']
     user_id = data['user_id']
-    print(user_id)
+    access_token = get_AccessToken(cur, conn, user_id)
 
-    url = "https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=1d5c0276b371931fdf8077209a90e460" + \
-        "&redirect_uri=https://0c0a-192-159-178-211.ngrok.io/auth&scope=account:write%20trading%20data&state="+user_id
-    print(url)
-    # if the user mentions connect with /alpaca, redirect to alpaca login
-    if text == "connect":
-        return Response(url), 200
-    elif text == "display":
-        return Response(handleDisplayAccount(user_id, 0)), 200
-    elif text == "":
-        return Response("HI"), 200
+    if text == "connect" and access_token == "":
+        return Response("https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=0c76f3a44caa688859359cab598c9969" +
+                        "&redirect_uri=" + NGROK + "/auth&scope=account:write%20trading%20data&state=" + user_id), 200
+    elif text == "connect" and access_token != "":
+        return Response("You are already authenticated! Try out our other commands -> /alpaca-buy | /alpaca-sell | /alpaca account | /alpaca positions")
+    elif text == "account" and access_token != "":
+        return AccountInfo(user_id)
+    elif text == "positions" and access_token != "":
+        return GetPositions(user_id)
+    elif text == "orders" and access_token != "":
+        return GetOrders(user_id)
+    else:
+        return Response("Invalid Command -> try 'connect', 'account', or 'positions'")
 
 
 @app.route('/auth', methods=['GET', 'POST'])
@@ -119,9 +122,9 @@ def buy():
 
     # Try placing a buy order
     order = placeOrder(symbol, qty, 'buy', headers)
-
-    if order.status_code == 200 and order.json()['status'] == 'accepted':
-        return Response(f'Bought {qty} {symbol} on Alpaca!'), 200
+    order_status = order.json()['status']
+    if order.status_code == 200:
+        return Response(f'Bought {qty} {symbol} on Alpaca. Order Status: {order_status}'), 200
     else:
         return Response("Error buying"), 200
 
@@ -144,47 +147,12 @@ def sell():
     # Try placing a sell order
     order = placeOrder(symbol, qty, 'sell', headers)
 
-    if order.status_code == 200 and order.json()['status'] == 'accepted':
-        return Response(f'Sold {qty} {symbol} on Alpaca!'), 200
+    order_status = order.json()['status']
+
+    if order.status_code == 200:
+        return Response(f'Sold {qty} {symbol} on Alpaca. Order Status: {order_status}. If it is pending_new, it will settle momentarily. You can check for any open order through "/alpaca orders" command'), 200
     else:
-        return Response("Error selling"), 200
-
-
-@app.route('/alpaca2-accountInfo', methods=['GET', 'POST'])
-def AccountInfo():
-
-    # Try to connect to DB
-    cur, conn = connect_DB()
-
-    data = request.form
-
-    user_id = data['user_id']
-
-    # Get the access token from DB if the user_id exists
-    access_token = get_AccessToken(cur, conn, user_id)
-
-    headers = {'Authorization': 'Bearer ' + access_token}
-
-    accountInfo = requests.get(
-        '{0}/v2/account'.format(BASE_ALPACA_PAPER_URL), headers=headers)
-
-    accountInfo = accountInfo.json()
-    print(accountInfo)
-    # gather the values from account
-    commands = {
-        "an": accountInfo['account_number'],
-        "eq": "$" + accountInfo['equity'],
-        "lmv": "$" + accountInfo['long_market_value'],
-        "smv": "$" + accountInfo['short_market_value'],
-        "ct": "$" + str(float(accountInfo['equity'])-float(accountInfo['last_equity'])),
-        "bp": "$" + accountInfo['buying_power']
-    }
-
-    # display the account values
-    message = "Account Number: {} | Equity: {} | Long Market Value {} | Short Market Value {} | Change Today {} | Buying Power {} ".format(
-        commands["an"], commands["eq"], commands["lmv"], commands["smv"], commands["ct"], commands["bp"])
-    print("THIS IS THE MESSAGE----> " + message)
-    return Response(message), 200
+        return Response("Error buying"), 200
 
 
 def connect_DB():
@@ -253,6 +221,86 @@ def placeOrder(symbol, qty, side, headers):
         print("There was an issue posting order to Alpaca: {0}".format(e))
 
     return order
+
+
+def GetPositions(user_id):
+    cur, conn = connect_DB()
+
+    # Get the access token from DB if the user_id exists
+    access_token = get_AccessToken(cur, conn, user_id)
+
+    headers = {'Authorization': 'Bearer ' + access_token}
+
+    # Make request to get account's positions
+    positions = requests.get(
+        '{0}/v2/positions'.format(BASE_ALPACA_PAPER_URL), headers=headers)
+
+    # Store the Json object and set up dictionary for display
+    positions = positions.json()
+    positions_list = {}
+    for pos in positions:
+        positions_list[pos['symbol']] = [pos['qty'], pos['unrealized_pl']]
+
+    prepend = 'Symbol\t|\tQty\t|\tUnrealized P/L\n'
+    positions_string = printIt(prepend, positions_list)
+
+    return Response(positions_string), 200
+
+
+def AccountInfo(user_id):
+    # Try to connect to DB
+    cur, conn = connect_DB()
+
+    # Get the access token from DB if the user_id exists
+    access_token = get_AccessToken(cur, conn, user_id)
+
+    headers = {'Authorization': 'Bearer ' + access_token}
+
+    accountInfo = requests.get(
+        '{0}/v2/account'.format(BASE_ALPACA_PAPER_URL), headers=headers)
+
+    accountInfo = accountInfo.json()
+    # gather the values from account
+    commands = {
+        "an": accountInfo['account_number'],
+        "eq": "$" + accountInfo['equity'],
+        "lmv": "$" + accountInfo['long_market_value'],
+        "smv": "$" + accountInfo['short_market_value'],
+        "ct": "$" + str(float(accountInfo['equity'])-float(accountInfo['last_equity'])),
+        "bp": "$" + accountInfo['buying_power']
+    }
+
+    # display the account values
+    message = "Account Number: {} | Equity: {} | Long Market Value {} | Short Market Value {} | Change Today {} | Buying Power {} ".format(
+        commands["an"], commands["eq"], commands["lmv"], commands["smv"], commands["ct"], commands["bp"])
+    print("THIS IS THE MESSAGE----> " + message)
+    return Response(message), 200
+
+
+def GetOrders(user_id):
+    cur, conn = connect_DB()
+    access_token = get_AccessToken(cur, conn, user_id)
+    headers = {'Authorization': 'Bearer ' + access_token}
+
+    # Make request to get account's positions
+    print('getting orders now!!!!')
+    orders = requests.get(
+        '{0}/v2/orders'.format(BASE_ALPACA_PAPER_URL), headers=headers)
+    orders = orders.json()
+
+    if len(orders) == 0:
+        return Response("No open orders found"), 200
+    else:
+        return Response(orders), 200
+
+
+def printIt(prepend, dictionary):
+
+    stuff = ''
+    stuff = stuff + prepend
+    for key, value in dictionary.items():
+        stuff += str(key) + ':\t' + str(value[0]) + '\t' + str(value[1]) + '\n'
+    return stuff
 
 
 # Start your app
