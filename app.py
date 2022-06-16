@@ -25,14 +25,14 @@ BASE_ALPACA_LIVE_URL = 'https://api.alpaca.markets'
 # Initializes your app with your bot token and signing secret
 
 
-@app.route('/alpaca', methods=['GET', 'POST'])
+@app.route('/alpaca-live', methods=['GET', 'POST'])
 def alpaca():
     cur, conn = connect_DB()
     data = request.form
     text = data['text'] 
     user_id = data['user_id']
     access_token = get_AccessToken(cur, conn, user_id)
-    return Condition(text, user_id, 'live', access_token)
+    return Condition(text, user_id, 'live', access_token, data)
 
 @app.route('/alpaca-paper', methods=['GET', 'POST'])
 def paper():
@@ -41,10 +41,10 @@ def paper():
     text = data['text'] 
     user_id = data['user_id']
     access_token = get_AccessToken(cur, conn, user_id)
-    message = Condition(text, user_id, 'paper', access_token)
+    message = Condition(text, user_id, 'paper', access_token, data)
     return(message)
 
-def Condition(text, user_id, live, access_token):
+def Condition(text, user_id, live, access_token, data):
     if text == '':
         return Response("Please enter a command. Possible commands are: \n /alpaca connect : Connect your Alpaca account with Slack,\n /alpaca disonnect: Disconnect your Alpaca account from Slack,\n /alpaca-buy SYMBOL QTY: Place a BUY order on Alpaca for a given SYMBOL and QTY,\n  /alpaca-sell SYMBOL QTY: Place a SELL order on Alpaca for a given SYMBOL and QTY, /alpaca positions: Get your current positions on Alpaca,\n /alpaca orders: Get Open orders,\n /alpaca status: Connection status between Alpaca and Slack\n"), 200
     
@@ -73,12 +73,14 @@ def Condition(text, user_id, live, access_token):
         print('Checking STATUS!!!!!!!!!')
         return Response("Your Alpaca account is connected!")
     
+    elif len(text.split()) > 1 and access_token != None:
+        print("Trading")
+        return trade(data, live)
     elif text == 'status' and access_token == None:
         return Response("Your Alpaca account is not connected!. Please try connecting using '/alpaca connect' command.")
-    
+
     else:
         return Response("Invalid Command -> try 'connect', 'account', or 'positions'")
-
 
 @app.route('/auth', methods=['GET', 'POST'])
 def auth():
@@ -107,16 +109,11 @@ def auth():
         conn.close()
     return redirect("https://app.slack.com/client")
    
-
-@app.route('/alpaca-buy', methods=['GET', 'POST'])
-def buy():
+def trade(data, live):
     # Try to connect to DB
     cur, conn = connect_DB()
-
-    data = request.form
-
     # Retrieve the user_id and text from slash command
-    symbol, qty, user_id = get_params(data)
+    side, symbol, qty, user_id = get_params(data)
 
     # Get the access token from DB if the user_id exists
     access_token = get_AccessToken(cur, conn, user_id)
@@ -127,40 +124,16 @@ def buy():
     headers = {'Authorization': 'Bearer ' + access_token}
 
     # Try placing a buy order
-    order = placeOrder(symbol, qty, 'buy', headers)
+
+    order = placeOrder(symbol, qty, side, headers, live)
     order_status = order.json()['status']
     if order.status_code == 200:
-        return Response(f'Bought {qty} {symbol} on Alpaca. Order Status: {order_status}'), 200
+        if side == 'buy':
+            return Response(f'Bought {qty} {symbol} on Alpaca. Order Status: {order_status}'), 200
+        else:
+            return Response(f'Sold {qty} {symbol} on Alpaca. Order Status: {order_status}. If it is pending_new, it will settle momentarily. You can check for any open order through "/alpaca orders" command'), 200
     else:
-        return Response("Error buying"), 200
-
-
-@app.route('/alpaca-sell', methods=['GET', 'POST'])
-def sell():
-    # Try to connect to DB
-    cur, conn = connect_DB()
-
-    data = request.form
-
-    # Retrieve the user_id and text from slash command
-    symbol, qty, user_id = get_params(data)
-
-    # Get the access token from DB if the user_id exists and close the DB connection
-    access_token = get_AccessToken(cur, conn, user_id)
-
-    if access_token == None:
-        return Response('You must connect your account with Alpaca by authenticating first. Use /alpaca connect to connect your Alpaca account with Slack.'), 200
-    headers = {'Authorization': 'Bearer ' + access_token}
-
-    # Try placing a sell order
-    order = placeOrder(symbol, qty, 'sell', headers)
-
-    order_status = order.json()['status']
-
-    if order.status_code == 200:
-        return Response(f'Sold {qty} {symbol} on Alpaca. Order Status: {order_status}. If it is pending_new, it will settle momentarily. You can check for any open order through "/alpaca orders" command'), 200
-    else:
-        return Response("Error buying"), 200
+        return Response("Error buying/selling"), 200
 
 def AccountInfo(user_id, live):
     # Try to connect to DB
@@ -270,29 +243,40 @@ def get_params(data):
         text = data['text']
         user_id = data['user_id']
         params = text.split()
-        symbol = params[0].upper()
+        side = params[0].lower()
         qty = params[1]
+        symbol = params[2].upper()
         print(symbol + ' <---- this is the symbol')
         print(qty + ' <---- this is the qty')
         print(user_id + ' <---- this is the user id')
     except:
         print("Error getting data from slash command, perhaps missing/incorrect args")
 
-    return symbol, qty, user_id
+    return side, symbol, qty, user_id
 
 
-def placeOrder(symbol, qty, side, headers):
+def placeOrder(symbol, qty, side, headers, live):
     # Try placing a sell order
     try:
-        order = requests.post(
-            '{0}/v2/orders'.format(BASE_ALPACA_PAPER_URL), headers=headers, json={
-                'symbol': symbol,
-                'qty': qty,
-                'side': side,
-                'type': 'market',
-                'time_in_force': 'gtc',
-            })
-
+        if live == 'paper':
+            order = requests.post(
+                '{0}/v2/orders'.format(BASE_ALPACA_PAPER_URL), headers=headers, json={
+                    'symbol': symbol,
+                    'qty': qty,
+                    'side': side,
+                    'type': 'market',
+                    'time_in_force': 'gtc',
+                })
+        else:
+            order = requests.post(
+                '{0}/v2/orders'.format(BASE_ALPACA_LIVE_URL), headers=headers, json={
+                    'symbol': symbol,
+                    'qty': qty,
+                    'side': side,
+                    'type': 'market',
+                    'time_in_force': 'gtc',
+                })
+            
     except Exception as e:
         print("There was an issue posting order to Alpaca: {0}".format(e))
 
