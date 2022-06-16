@@ -42,6 +42,8 @@ def alpaca():
         return AccountInfo(user_id)
     elif text == "positions" and access_token != "":
         return GetPositions(user_id)
+    elif text == "orders" and access_token != "":
+        return GetOrders(user_id)
     else:
         return Response("Invalid Command -> try 'connect', 'account', or 'positions'")
         
@@ -175,6 +177,18 @@ def GetPositions(user_id):
         list_positions['current_price'].append(pos['current_price'])
 
     return Response(print(list_positions)), 200
+
+def GetOrders(user_id):
+    cur, conn = connect_DB()
+    access_token = get_AccessToken(cur, conn, user_id)
+    headers = {'Authorization': 'Bearer ' + access_token}
+
+    # Make request to get account's positions
+    orders = requests.get(
+        '{0}/v2/orders'.format(BASE_ALPACA_PAPER_URL), headers=headers)
+    orders = orders.json()
+    print(orders)
+    return Response(""), 200
 
 ## HELPER FUNCTIONS BELOW
 def connect_DB():
