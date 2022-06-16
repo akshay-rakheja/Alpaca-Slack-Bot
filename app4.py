@@ -1,12 +1,5 @@
-import os
-import re
-import slack
 import requests
-from pathlib import Path
-from dotenv import load_dotenv
-from flask import Flask, request, Response, jsonify, abort, redirect
-from slackeventsapi import SlackEventAdapter
-# import alpaca_trade_api as alpaca
+from flask import Flask, request, Response, redirect
 import config
 from slack_sdk import WebClient
 import psycopg2
@@ -14,8 +7,6 @@ import psycopg2
 
 # Configure flask app
 app = Flask(__name__)
-slackeventadapter = SlackEventAdapter(
-    config.SLACK_SIGNING_SECRET, "/slack/events", app)
 
 client = WebClient(token=config.SLACK_TOKEN)
 
@@ -35,26 +26,26 @@ ALPACA_CLIENT_SECRET = config.ALPACA_CLIENT_SECRET
 
 NGROK = "https://eadf-192-159-178-211.ngrok.io"
 
+# in memory "database"
+user_access_tokens = {}
 
 @app.route('/alpaca2-live', methods=['GET', 'POST'])
 def alpaca():
     print("Entering LIVE!!!!!!!")
-    cur, conn = connect_DB()
     data = request.form
     text = data['text']
     user_id = data['user_id']
-    access_token = get_AccessToken(cur, conn, user_id)
+    access_token = get_AccessToken(user_id)
     return Condition(text, user_id, 'live', access_token, data)
 
 
 @app.route('/alpaca2-paper', methods=['GET', 'POST'])
 def paper():
     print("Entering Paper!!!!!")
-    cur, conn = connect_DB()
     data = request.form
     text = data['text']
     user_id = data['user_id']
-    access_token = get_AccessToken(cur, conn, user_id)
+    access_token = get_AccessToken(user_id)
     message = Condition(text, user_id, 'paper', access_token, data)
     print("ERROR!!!")
     return(message)
@@ -102,7 +93,6 @@ def Condition(text, user_id, live, access_token, data):
 
 @app.route('/auth', methods=['GET', 'POST'])
 def auth():
-    cur, conn = connect_DB()
     # need to check if already authenticated, gives error right now
     auth_code = request.args.get("code")
     user_id = request.args.get("state")
@@ -119,23 +109,19 @@ def auth():
         # set user's authentication status to true
     access_token = access_response.json()['access_token']
     print(access_token + ' <---- this is the access token')
-    if access_token != "":
-        cur.execute('insert into token_table (user_id, access_token) values (%s, %s)', (
-            user_id, access_token))
-        conn.commit()
-        cur.close()
-        conn.close()
+
+    user_access_tokens[user_id] = access_token
+
     return redirect("https://app.slack.com/client")
 
 
 def trade(data, live):
-    # Try to connect to DB
-    cur, conn = connect_DB()
+
     # Retrieve the user_id and text from slash command
     side, symbol, qty, user_id = get_params(data)
 
     # Get the access token from DB if the user_id exists
-    access_token = get_AccessToken(cur, conn, user_id)
+    access_token = get_AccessToken(user_id)
 
     if access_token == None:
         return Response('You must connect your account with Alpaca by authenticating first. Use /alpaca connect to connect your Alpaca account with Slack.'), 200
@@ -158,10 +144,9 @@ def trade(data, live):
 
 def AccountInfo(user_id, live):
     # Try to connect to DB
-    cur, conn = connect_DB()
 
     # Get the access token from DB if the user_id exists
-    access_token = get_AccessToken(cur, conn, user_id)
+    access_token = get_AccessToken(user_id)
 
     headers = {'Authorization': 'Bearer ' + access_token}
 
@@ -191,10 +176,8 @@ def AccountInfo(user_id, live):
 
 
 def GetPositions(user_id, live):
-    cur, conn = connect_DB()
-
     # Get the access token from DB if the user_id exists
-    access_token = get_AccessToken(cur, conn, user_id)
+    access_token = get_AccessToken(user_id)
 
     headers = {'Authorization': 'Bearer ' + access_token}
 
@@ -219,8 +202,7 @@ def GetPositions(user_id, live):
 
 
 def GetOrders(user_id):
-    cur, conn = connect_DB()
-    access_token = get_AccessToken(cur, conn, user_id)
+    access_token = get_AccessToken(user_id)
     headers = {'Authorization': 'Bearer ' + access_token}
 
     # Make request to get account's positions
@@ -233,33 +215,12 @@ def GetOrders(user_id):
 # HELPER FUNCTIONS BELOW
 
 
-def connect_DB():
-    # Try to connect to DB
-    try:
-        # connect to db
-        conn = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME,
-                                user=config.DB_USER, password=config.DB_PASSWORD)
-        # Open Cursor
-        cur = conn.cursor()
-    except:
-        print("Error connecting to DB")
+def get_AccessToken(user_id):
 
-    return cur, conn
-
-
-def get_AccessToken(cur, conn, user_id):
-    # Get the access token from DB if the user_id exists
-    try:
-        cur.execute(
-            'SELECT access_token FROM token_table WHERE user_id = %s', (user_id,))
-
-        access_token = cur.fetchone()[0]
-        cur.close()
-        conn.close()
-        return access_token
-    except(Exception, psycopg2.DatabaseError) as error:
-        print("Error getting access token: ", error)
-
+    if user_id in user_access_tokens:
+        return user_access_tokens[user_id]
+    else:
+        print("Error getting access token: token does not exist.")
 
 def get_params(data):
     # Retrieve command args and verify user here
@@ -310,16 +271,11 @@ def placeOrder(symbol, qty, side, headers, live):
 
 
 def disconnectUser(user_id):
-    cur, conn = connect_DB()
-    try:
-        cur.execute(
-            'DELETE FROM token WHERE user_id = %s', (user_id,))
-        conn.commit()
-        cur.close()
-        conn.close()
-    except(Exception, psycopg2.DatabaseError) as error:
-        print("Error removing user and access token: ", error)
 
+    if user_id in user_access_tokens:
+        del user_access_tokens[user_id]
+    else:
+        print("Error removing user and access token: this user's access token has not been stored.")
 
 def printIt(prepend, dictionary):
 
