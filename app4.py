@@ -33,7 +33,7 @@ ALPACA_CLIENT_ID = config.ALPACA_CLIENT_ID
 ALPACA_CLIENT_SECRET = config.ALPACA_CLIENT_SECRET
 
 
-NGROK = "https://eadf-192-159-178-211.ngrok.io"
+NGROK = "https://6825-192-159-178-211.ngrok.io"
 
 
 @app.route('/alpaca2-live', methods=['GET', 'POST'])
