@@ -36,7 +36,7 @@ ALPACA_CLIENT_SECRET = config.ALPACA_CLIENT_SECRET
 NGROK = "https://6825-192-159-178-211.ngrok.io"
 
 
-@app.route('/alpaca2-live', methods=['GET', 'POST'])
+@app.route('/alpaca-live', methods=['GET', 'POST'])
 def alpaca():
     print("Entering LIVE!!!!!!!")
     cur, conn = connect_DB()
@@ -47,7 +47,7 @@ def alpaca():
     return Condition(text, user_id, 'live', access_token, data)
 
 
-@app.route('/alpaca2-paper', methods=['GET', 'POST'])
+@app.route('/alpaca-paper', methods=['GET', 'POST'])
 def paper():
     print("Entering Paper!!!!!")
     cur, conn = connect_DB()
@@ -56,14 +56,16 @@ def paper():
     user_id = data['user_id']
     access_token = get_AccessToken(cur, conn, user_id)
     message = Condition(text, user_id, 'paper', access_token, data)
-    print("ERROR!!!")
     return(message)
 
 
 def Condition(text, user_id, live, access_token, data):
-    if text == '':
-        return Response("Please enter a command. Possible commands are: \n /alpaca connect : Connect your Alpaca account with Slack,\n /alpaca disonnect: Disconnect your Alpaca account from Slack,\n /alpaca-buy SYMBOL QTY: Place a BUY order on Alpaca for a given SYMBOL and QTY,\n  /alpaca-sell SYMBOL QTY: Place a SELL order on Alpaca for a given SYMBOL and QTY, /alpaca positions: Get your current positions on Alpaca,\n /alpaca orders: Get Open orders,\n /alpaca status: Connection status between Alpaca and Slack\n"), 200
-
+    print("Text is : ", text, "Data is : ", data)
+    print(data['command'])
+    if data['command'] == '/alpaca-paper' and text == '':
+        return Response(":llama:*Welcome to Alpaca for Slack app for paper trading accounts*. You will need to create an Alpaca account first. You can sign up for free by going here: < https: // alpaca.markets/>\n\n Please enter a command. Possible commands are: \n `/ alpaca-paper connect`: Connect your Alpaca account with Slack. It will connect * both * your paper and live accounts.\n `/ alpaca-paper disonnect`: Disconnect your Alpaca account from Slack. It will disconnect both your paper and live accounts.\n `/ alpaca-paper account`: Check your Paper trading account information. \n`/ alpaca-paper buy QTY SYMBOL`: Place a BUY order on your Alpaca paper account for a given SYMBOL and QTY, \n  `/ alpaca-paper sell QTY SYMBOL`: Place a SELL order on your Alpaca paper account for a given SYMBOL and QTY, \n `/ alpaca-paper positions`: Get your current paper positions on Alpaca, \n `/ alpaca-paper orders`: Get Open orders on Alpaca Paper account, \n `/ alpaca-paper status`: Connection status between Alpaca and Slack\n"), 200
+    elif data['command'] == '/alpaca-live' and text == '':
+        return Response(":llama:*Welcome to Alpaca for Slack app for live trading accounts*. You will need to create an Alpaca account first. You can sign up for free by going here: <https://alpaca.markets/>\n\n Please enter a command. Possible commands are: \n `/alpaca-live connect` : Connect your Alpaca account with Slack. It will connect *both* your paper and live accounts.\n `/alpaca-live disonnect`: Disconnect your Alpaca account from Slack. It will disconnect both your paper and live accounts.\n `/alpaca-live account`: Check your Live trading account information. \n`/alpaca-live buy QTY SYMBOL`: Place a BUY order on your Alpaca paper account for a given SYMBOL and QTY,\n  `/alpaca-live sell QTY SYMBOL`: Place a SELL order on your Alpaca paper account for a given SYMBOL and QTY,\n `/alpaca-live positions`: Get your current paper positions on Alpaca,\n `/alpaca-live orders`: Get Open orders on Alpaca Paper account,\n `/alpaca-live status`: Connection status between Alpaca and Slack\n"), 200
     elif text == "connect" and access_token == None:
         print("Connecting user: ", user_id)
         return Response("Please follow the link to authorize this application to connect to your Alpaca account: https://app.alpaca.markets/oauth/authorize?response_type=code&client_id=" + ALPACA_CLIENT_ID +
@@ -71,11 +73,11 @@ def Condition(text, user_id, live, access_token, data):
 
     elif text == "connect" and access_token != None:
         print("hello")
-        return Response("You are already authenticated! Try out our other commands -> /alpaca-buy | /alpaca-sell | /alpaca account | /alpaca positions"), 200
+        return Response("You are already authenticated! Try out our other commands -> `/alpaca-paper buy QTY SYMBOL` | `/alpaca-paper sell QTY SYMBOL` | `/alpaca-paper account` | `/alpaca-paper positions`"), 200
 
     elif text == "disconnect" and access_token != None:
         disconnectUser(user_id)
-        return Response("Your Alpaca account has been disconnected. Re-connect to Alpaca by typing /alpaca connect"), 200
+        return Response("Your Alpaca account has been disconnected. Re-connect to Alpaca by trying `/alpaca-paper connect`"), 200
 
     elif text == "account" and access_token != None:
         return AccountInfo(user_id, live)
@@ -94,10 +96,10 @@ def Condition(text, user_id, live, access_token, data):
         print(access_token)
         return trade(data, live)
     elif text == 'status' and access_token == None:
-        return Response("Your Alpaca account is not connected!. Please try connecting using '/alpaca connect' command.")
+        return Response("Your Alpaca account is not connected!. Please try connecting using `/alpaca-paper connect` command.")
 
     else:
-        return Response("Invalid Command -> try 'connect', 'account', or 'positions'")
+        return Response("You are either not connected on provided an invalid command. Try `/alpaca-paper` with `connect` or `status`.")
 
 
 @app.route('/auth', methods=['GET', 'POST'])
@@ -117,15 +119,20 @@ def auth():
             'redirect_uri': redirect_uri
         })
         # set user's authentication status to true
-    access_token = access_response.json()['access_token']
-    print(access_token + ' <---- this is the access token')
-    if access_token != "":
-        cur.execute('insert into token_table (user_id, access_token) values (%s, %s)', (
-            user_id, access_token))
-        conn.commit()
-        cur.close()
-        conn.close()
-    return redirect("https://app.slack.com/client")
+    if user_id != None:
+        access_token = access_response.json()['access_token']
+        print(access_token + ' <---- this is the access token')
+        if access_token != None:
+            cur.execute('insert into token_table (user_id, access_token) values (%s, %s)', (
+                user_id, access_token))
+            conn.commit()
+            cur.close()
+            conn.close()
+            client.chat_postMessage(
+                text="You are now connected to Alpaca!:llama:", channel=user_id)
+            return redirect("slack://open")
+    else:
+        return Response("Something went wrong. Please try again.")
 
 
 def trade(data, live):
@@ -184,7 +191,7 @@ def AccountInfo(user_id, live):
     }
 
     # display the account values
-    message = "Account Number: {} | Equity: {} | Long Market Value {} | Short Market Value {} | Change Today {} | Buying Power {} ".format(
+    message = "*Account Number*: {} \n *Equity*: {}\n*Long Market Value*: {}\n*Short Market Value*: {}\n*Change Today*: {}\n*Buying Power*: {}".format(
         commands["an"], commands["eq"], commands["lmv"], commands["smv"], commands["ct"], commands["bp"])
     print("THIS IS THE MESSAGE----> " + message)
     return Response(message), 200
@@ -218,17 +225,23 @@ def GetPositions(user_id, live):
     return Response(positions_string), 200
 
 
-def GetOrders(user_id):
+def GetOrders(user_id, live):
     cur, conn = connect_DB()
     access_token = get_AccessToken(cur, conn, user_id)
     headers = {'Authorization': 'Bearer ' + access_token}
 
     # Make request to get account's positions
-    orders = requests.get(
-        '{0}/v2/orders'.format(BASE_ALPACA_PAPER_URL), headers=headers)
+    if live == 'paper':
+        orders = requests.get(
+            '{0}/v2/orders'.format(BASE_ALPACA_PAPER_URL), headers=headers)
+    else:
+        orders = requests.get(
+            '{0}/v2/orders'.format(BASE_ALPACA_LIVE_URL), headers=headers)
     orders = orders.json()
-    print(orders)
-    return Response(""), 200
+    if len(orders) == 0:
+        return Response("No open orders found"), 200
+    else:
+        return Response(orders), 200
 
 # HELPER FUNCTIONS BELOW
 
@@ -313,10 +326,13 @@ def disconnectUser(user_id):
     cur, conn = connect_DB()
     try:
         cur.execute(
-            'DELETE FROM token WHERE user_id = %s', (user_id,))
+            'DELETE FROM token_table WHERE user_id = %s', (user_id,))
         conn.commit()
         cur.close()
         conn.close()
+        client.chat_postMessage(
+            text="You are now disconnected from Alpaca!:llama:", channel=user_id)
+
     except(Exception, psycopg2.DatabaseError) as error:
         print("Error removing user and access token: ", error)
 
